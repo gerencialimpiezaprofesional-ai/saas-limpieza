@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "tenant": {
+      "title": "Tenant",
+      "description": "A company using the CleanFlow AI platform.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "user": {
+      "title": "User",
+      "description": "A user belonging to a tenant with a specific role.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["ceo", "rh", "supervisor", "operator"] },
+        "tenantId": { "type": "string" },
+        "name": { "type": "string" },
+        "points": { "type": "number" }
+      },
+      "required": ["email", "role", "tenantId", "name"]
+    },
+    "client": {
+      "title": "Client",
+      "description": "A client company served by the tenant.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "activeServices": { "type": "number" }
+      },
+      "required": ["name", "tenantId"]
+    },
+    "task": {
+      "title": "Task",
+      "description": "A cleaning task assigned to an operator.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "clientId": { "type": "string" },
+        "operatorId": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "rejected"] },
+        "score": { "type": "number" },
+        "beforePhoto": { "type": "string" },
+        "afterPhoto": { "type": "string" }
+      },
+      "required": ["title", "clientId", "operatorId", "tenantId", "status"]
+    },
+    "inventory": {
+      "title": "Inventory",
+      "description": "Cleaning supplies and stock levels.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "stock": { "type": "string" },
+        "min": { "type": "string" },
+        "status": { "type": "string", "enum": ["ok", "low"] },
+        "usage": { "type": "string" },
+        "tenantId": { "type": "string" }
+      },
+      "required": ["name", "stock", "min", "status", "tenantId"]
+    }
+  },
+  "firestore": {
+    "/tenants/{tenantId}": {
+      "schema": "tenant",
+      "description": "Tenant organization data."
+    },
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "User profiles and roles."
+    },
+    "/clients/{clientId}": {
+      "schema": "client",
+      "description": "Clients served by the cleaning company."
+    },
+    "/tasks/{taskId}": {
+      "schema": "task",
+      "description": "Cleaning tasks and AI validation results."
+    },
+    "/inventory/{itemId}": {
+      "schema": "inventory",
+      "description": "Inventory items and stock tracking."
+    }
+  }
+}

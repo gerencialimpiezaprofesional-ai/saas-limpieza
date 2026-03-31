@@ -1,0 +1,54 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&family=Montserrat:wght@700;800&display=swap');
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-headline: "Plus Jakarta Sans", sans-serif;
+  --font-industrial: "Montserrat", sans-serif;
+
+  --color-background: #04132c;
+  --color-surface: #04132c;
+  --color-surface-container: #111f39;
+  --color-surface-container-low: #0d1b35;
+  --color-surface-container-high: #1c2a44;
+  --color-surface-container-highest: #283450;
+  
+  --color-primary: #b4c5fd;
+  --color-primary-container: #1a2c5b;
+  --color-on-primary: #1c2e5d;
+  
+  --color-secondary: #44ddc2;
+  --color-secondary-container: #00bea5;
+  --color-on-secondary: #00382f;
+  
+  --color-tertiary: #ffba38;
+  --color-error: #ffb4ab;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-white font-sans;
+  }
+}
+
+.glass-panel {
+  @apply bg-[#1a2c5b]/40 backdrop-blur-xl border border-white/5;
+}
+
+.radar-pulse {
+  @apply relative;
+}
+
+.radar-pulse::after {
+  content: '';
+  @apply absolute inset-0 rounded-full border-2 border-secondary opacity-0 scale-100;
+}
+
+@keyframes radar {
+  0% { transform: scale(1); opacity: 0.5; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+.animate-radar::after {
+  animation: radar 2s infinite;
+}
