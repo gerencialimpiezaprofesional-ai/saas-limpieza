@@ -26,8 +26,27 @@
 }
 
 @layer base {
+  :root {
+    --sat: env(safe-area-inset-top);
+    --sar: env(safe-area-inset-right);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
+  }
+
+  html {
+    height: -webkit-fill-available;
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
-    @apply bg-background text-white font-sans;
+    @apply bg-background text-white font-sans overflow-x-hidden antialiased;
+    min-height: 100vh;
+    min-height: 100dvh;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    touch-action: manipulation;
   }
 }
 
@@ -44,11 +63,11 @@
   @apply absolute inset-0 rounded-full border-2 border-secondary opacity-0 scale-100;
 }
 
-@keyframes radar {
+@keyframes radar-pulse {
   0% { transform: scale(1); opacity: 0.5; }
-  100% { transform: scale(2.5); opacity: 0; }
+  100% { transform: scale(1.8); opacity: 0; }
 }
 
-.animate-radar::after {
-  animation: radar 2s infinite;
+.animate-radar-pulse {
+  animation: radar-pulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }

@@ -1,8 +1,9 @@
 {
-  "name": "CleanFlow AI",
+  "name": "Impeccable AI",
   "description": "SaaS platform for industrial cleaning management with AI-powered quality inspection, logistics, and gamification.",
   "requestFramePermissions": [
     "camera",
+    "microphone",
     "geolocation"
   ]
 }

@@ -1,90 +1,244 @@
 {
   "entities": {
-    "tenant": {
-      "title": "Tenant",
-      "description": "A company using the CleanFlow AI platform.",
+    "User": {
+      "title": "User Profile",
+      "description": "System user with role-based access and tenant isolation.",
       "type": "object",
       "properties": {
+        "uid": { "type": "string" },
         "name": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["name"]
-    },
-    "user": {
-      "title": "User",
-      "description": "A user belonging to a tenant with a specific role.",
-      "type": "object",
-      "properties": {
         "email": { "type": "string", "format": "email" },
-        "role": { "type": "string", "enum": ["ceo", "rh", "supervisor", "operator"] },
+        "role": { "type": "string", "enum": ["ceo", "rh", "supervisor", "operator", "client", "superadmin"] },
         "tenantId": { "type": "string" },
-        "name": { "type": "string" },
-        "points": { "type": "number" }
+        "points": { "type": "number" },
+        "phone": { "type": "string" },
+        "tempPassword": { "type": "string" },
+        "joinDate": { "type": "string" },
+        "psychometricScore": { "type": "number" },
+        "reliabilityScore": { "type": "number" },
+        "technicalSkills": { "type": "array" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "lastCheckIn": { "type": "object" },
+        "lastLocation": { "type": "object" },
+        "lastSelfie": { "type": "string" },
+        "isInventoryManager": { "type": "boolean" }
       },
-      "required": ["email", "role", "tenantId", "name"]
+      "required": ["uid", "role", "tenantId"]
     },
-    "client": {
-      "title": "Client",
-      "description": "A client company served by the tenant.",
+    "Client": {
+      "title": "Client Location",
+      "description": "A service location assigned to a tenant.",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
+        "address": { "type": "string" },
+        "location": { "type": "object" },
+        "schedule": { "type": "string" },
         "tenantId": { "type": "string" },
-        "activeServices": { "type": "number" }
+        "areas": { "type": "array" },
+        "assignedStaff": { "type": "array" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
       },
       "required": ["name", "tenantId"]
     },
-    "task": {
-      "title": "Task",
-      "description": "A cleaning task assigned to an operator.",
+    "Task": {
+      "title": "Operational Task",
+      "description": "A specific cleaning or maintenance task assigned to an operator.",
       "type": "object",
       "properties": {
         "title": { "type": "string" },
+        "client": { "type": "string" },
         "clientId": { "type": "string" },
         "operatorId": { "type": "string" },
-        "tenantId": { "type": "string" },
+        "operatorName": { "type": "string" },
         "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "rejected"] },
         "score": { "type": "number" },
-        "beforePhoto": { "type": "string" },
-        "afterPhoto": { "type": "string" }
+        "aiNotes": { "type": "string" },
+        "afterPhoto": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "createdAt": { "type": "object" },
+        "updatedAt": { "type": "object" }
       },
-      "required": ["title", "clientId", "operatorId", "tenantId", "status"]
+      "required": ["title", "clientId", "operatorId", "tenantId"]
     },
-    "inventory": {
-      "title": "Inventory",
-      "description": "Cleaning supplies and stock levels.",
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Cleaning supply or equipment in stock.",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
-        "stock": { "type": "string" },
-        "min": { "type": "string" },
-        "status": { "type": "string", "enum": ["ok", "low"] },
+        "stock": { "type": "number" },
+        "min": { "type": "number" },
+        "unit": { "type": "string" },
         "usage": { "type": "string" },
+        "status": { "type": "string" },
+        "tenantId": { "type": "string" }
+      }
+    },
+    "Requisition": {
+      "title": "Supply Request",
+      "description": "Request for supplies by staff members.",
+      "type": "object",
+      "properties": {
+        "items": { "type": "array" },
+        "requestedBy": { "type": "string" },
+        "role": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "fulfilled"] },
+        "tenantId": { "type": "string" }
+      }
+    },
+    "Redemption": {
+      "title": "Reward Redemption",
+      "description": "A reward claimed by a user using earned points.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "rewardId": { "type": "string" },
+        "rewardTitle": { "type": "string" },
+        "points": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "applied"] },
+        "tenantId": { "type": "string" }
+      }
+    },
+    "Post": {
+      "title": "Social Feed Post",
+      "description": "Update or achievement shared on the team feed.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "content": { "type": "string" },
+        "likes": { "type": "array" },
+        "tenantId": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "Candidate": {
+      "title": "RH Candidate",
+      "description": "Applicant in the recruitment funnel.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "status": { "type": "string" },
+        "tenantId": { "type": "string" }
+      }
+    },
+    "Staff": {
+      "title": "Staff Member",
+      "description": "Validated employee record in the RH system.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "joinDate": { "type": "string" },
+        "phone": { "type": "string" },
+        "tempPassword": { "type": "string" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Targeted system update for users or roles.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "targetRoles": { "type": "array" }
+      }
+    },
+    "Audit": {
+      "title": "Service Audit",
+      "description": "Historical record of service completion and IA evaluation.",
+      "type": "object",
+      "properties": {
+        "score": { "type": "number" },
+        "observations": { "type": "string" },
+        "criteria": { "type": "array" },
+        "tenantId": { "type": "string" },
+        "operatorId": { "type": "string" },
+        "operatorName": { "type": "string" },
+        "status": { "type": "string" },
+        "afterPhoto": { "type": "string" },
+        "type": { "type": "string" },
+        "taskId": { "type": "string" },
+        "createdAt": { "type": "object" }
+      }
+    },
+    "Report": {
+      "title": "IA Executive Report",
+      "description": "Formal report generated by IA for a tenant.",
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string" },
+        "supervisorId": { "type": "string" },
+        "supervisorName": { "type": "string" },
+        "type": { "type": "string" },
+        "summary": { "type": "string" },
+        "kpis": { "type": "object" },
+        "createdAt": { "type": "object" }
+      }
+    },
+    "Tenant": {
+      "title": "Tenant Settings",
+      "description": "Global settings and reward catalog for a company.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logo": { "type": "string" },
+        "aiStrictness": { "type": "string" },
+        "rewards": { "type": "array" }
+      }
+    },
+    "Attendance": {
+      "title": "Employee Attendance",
+      "description": "Check-in record from various sources including WhatsApp.",
+      "type": "object",
+      "properties": {
+        "employee_id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "source": { "type": "string" },
+        "checkin_method": { "type": "string" },
+        "evidence_url": { "type": "string" },
+        "selfie_verified": { "type": "boolean" },
+        "geolocation_verified": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["approved", "rejected", "pending"] },
         "tenantId": { "type": "string" }
       },
-      "required": ["name", "stock", "min", "status", "tenantId"]
+      "required": ["employee_id", "timestamp", "source"]
+    },
+    "WhitelistEntry": {
+      "title": "WhatsApp Whitelist",
+      "description": "Authorized phone numbers and their associated employee IDs.",
+      "type": "object",
+      "properties": {
+        "phone": { "type": "string" },
+        "employee_id": { "type": "string" },
+        "tenantId": { "type": "string" },
+        "authorized": { "type": "boolean" }
+      },
+      "required": ["phone", "employee_id", "tenantId"]
     }
   },
   "firestore": {
-    "/tenants/{tenantId}": {
-      "schema": "tenant",
-      "description": "Tenant organization data."
-    },
-    "/users/{userId}": {
-      "schema": "user",
-      "description": "User profiles and roles."
-    },
-    "/clients/{clientId}": {
-      "schema": "client",
-      "description": "Clients served by the cleaning company."
-    },
-    "/tasks/{taskId}": {
-      "schema": "task",
-      "description": "Cleaning tasks and AI validation results."
-    },
-    "/inventory/{itemId}": {
-      "schema": "inventory",
-      "description": "Inventory items and stock tracking."
-    }
+    "/users/{userId}": { "schema": "User", "description": "User profiles" },
+    "/clients/{clientId}": { "schema": "Client", "description": "Service locations" },
+    "/tasks/{taskId}": { "schema": "Task", "description": "Operational tasks" },
+    "/inventory/{itemId}": { "schema": "InventoryItem", "description": "Cleaning supplies" },
+    "/requisitions/{reqId}": { "schema": "Requisition", "description": "Supply requests" },
+    "/redemptions/{redemptionId}": { "schema": "Redemption", "description": "Reward redemptions" },
+    "/posts/{postId}": { "schema": "Post", "description": "Community posts" },
+    "/candidates/{candidateId}": { "schema": "Candidate", "description": "Recruitment funnel" },
+    "/staff/{memberId}": { "schema": "Staff", "description": "Active employee records" },
+    "/notifications/{notifId}": { "schema": "Notification", "description": "Global and role-based notifications" },
+    "/audits/{auditId}": { "schema": "Audit", "description": "Historical audit records" },
+    "/reports/{reportId}": { "schema": "Report", "description": "IA generated executive reports" },
+    "/tenants/{tenantId}": { "schema": "Tenant", "description": "Company settings and reward catalog" },
+    "/attendance/{checkinId}": { "schema": "Attendance", "description": "Employee attendance logs" },
+    "/erp_whitelist/{senderId}": { "schema": "WhitelistEntry", "description": "Validated WhatsApp numbers" },
+    "/test/{docId}": { "schema": "object", "description": "Connectivity test collection" }
   }
 }

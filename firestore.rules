@@ -2,90 +2,253 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // 0. Global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     // ===============================================================
-    // Assumed Data Model
+    // Global Helpers
     // ===============================================================
-    // Collection: tenants
-    // Fields: name, subscriptionStatus, plan, createdAt, whatsappQrCode
-    //
-    // Collection: users
-    // Fields: tenantId, name, email, role, points, streak, level, photoUrl, gpsActive, currentSector
-    //
-    // Collection: services
-    // Fields: tenantId, operatorId, location, startTime, endTime, status, qualityScore, aiCertificateUrl
-    //
-    // Collection: tasks (subcollection of services)
-    // Fields: serviceId, title, beforePhotoUrl, afterPhotoUrl, status, aiAnalysis, qualityScore, metadataIntegrity
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // Auth tokens never contain custom claims in this env, we MUST look up
+    function getUserDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+    function hasProfile(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid));
+    }
+    function myData() { 
+      return getUserDoc(request.auth.uid).data; 
+    }
+    function myRole() { 
+      return (request.auth.token.email == 'gerencia.limpiezaprofesional@gmail.com') ? 'superadmin' :
+             (request.auth.token.email == 'ceo@impeccable.com') ? 'ceo' :
+             (request.auth.token.email == 'rh@impeccable.com') ? 'rh' :
+             (request.auth.token.email == 'supervisor.limpiezaprofesional@gmail.com') ? 'supervisor' :
+             (hasProfile(request.auth.uid) ? myData().get('role', 'operator') : 'operator'); 
+    }
+    function myTenant() { 
+      return (request.auth.token.email == 'gerencia.limpiezaprofesional@gmail.com' || 
+              request.auth.token.email.matches('.*@impeccable\\.com') || 
+              request.auth.token.email.matches('.*\\.limpiezaprofesional@gmail\\.com')) 
+             ? 'impeccable-prod-001' 
+             : (hasProfile(request.auth.uid) ? myData().get('tenantId', 'impeccable-prod-001') : 'impeccable-prod-001'); 
+    }
+    function myClientId() { 
+      return hasProfile(request.auth.uid) ? myData().get('clientId', 'none') : 'none'; 
+    }
+    
+    function isDemoUser() {
+      return isSignedIn() && (request.auth.token.email.matches('.*@impeccable\\.com') || 
+             request.auth.token.email == 'gerencia.limpiezaprofesional@gmail.com' || 
+             request.auth.token.email == 'supervisor.limpiezaprofesional@gmail.com' ||
+             request.auth.token.email.matches('.*\\.limpiezaprofesional@gmail\\.com'));
+    }
+    
+    function isSuperAdmin() { 
+      return isSignedIn() && (
+        request.auth.token.email == 'gerencia.limpiezaprofesional@gmail.com' || 
+        (hasProfile(request.auth.uid) && myData().get('role', 'operator') == 'superadmin')
+      ); 
+    }
+    function isAdmin() { 
+      return isSignedIn() && (
+        isSuperAdmin() || 
+        request.auth.token.email == 'ceo@impeccable.com' || 
+        (hasProfile(request.auth.uid) && myData().get('role', 'operator') == 'ceo')
+      ); 
+    }
+    function isRH() { return isSignedIn() && (myRole() == 'rh' || isAdmin()); }
+    function isSupervisor() { return isSignedIn() && (myRole() == 'supervisor' || isRH()); }
+    function isClient() { return isSignedIn() && (myRole() == 'client' || isAdmin()); }
+    function isTotem() { return isSignedIn() && (myRole() == 'totem' || isSupervisor()); }
+
     // ===============================================================
-
-    // Helper Functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    
-    function isAdmin() {
-      return isAuthenticated() && 
-        ((getUserData().role == 'admin' || getUserData().role == 'ceo') || 
-         (request.auth.token.email == "gerencia.limpiezaprofesional@gmail.com"));
-    }
-    
-    function isCEO() {
-      return isAuthenticated() && (getUserData().role == 'ceo' || isAdmin());
-    }
-
-    function sameTenant(data) {
-      return isAuthenticated() && (getUserData().tenantId == data.tenantId || isAdmin());
-    }
-
-    // Domain Validators
-    function isValidUser(data) {
-      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
-             data.role in ['operator', 'supervisor', 'admin', 'ceo', 'rh', 'cliente'] &&
-             data.tenantId is string;
-    }
-
-    function isValidTask(data) {
-      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
-             data.status in ['pending', 'in_progress', 'completed', 'rejected'] &&
-             data.tenantId is string &&
-             data.clientId is string &&
-             data.operatorId is string;
-    }
-
-    match /tenants/{tenantId} {
-      allow read: if isAuthenticated() && (getUserData().tenantId == tenantId || isAdmin());
-      allow write: if isAdmin() || (isAuthenticated() && request.auth.token.email == "gerencia.limpiezaprofesional@gmail.com");
-    }
+    // Collection Match Blocks
+    // ===============================================================
 
     match /users/{userId} {
-      allow read: if isAuthenticated() && (isOwner(userId) || getUserData().tenantId == resource.data.tenantId || isAdmin());
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isAdmin() || request.auth.token.email == "gerencia.limpiezaprofesional@gmail.com");
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      function isValidUser(data) {
+        return (data.get('uid', userId) is string) && 
+               data.get('email', 'pending@impeccable.com') is string &&
+               data.role in ['ceo', 'rh', 'supervisor', 'operator', 'client', 'superadmin', 'totem'] &&
+               data.tenantId is string;
+      }
+      
+      // Ownership and self-read
+      allow get: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || isDemoUser() || (hasProfile(request.auth.uid) && myTenant() == (existing().get('tenantId', 'none'))));
+      allow list: if isSignedIn() && (
+        isSuperAdmin() || 
+        isDemoUser() ||
+        (resource.data.get('tenantId', '') == myTenant() && (myRole() != 'totem' || resource.data.get('clientId', 'none') == myClientId()))
+      );
+      
+      allow create: if isSignedIn() && (isValidUser(incoming()) || isDemoUser());
+      
+      allow update: if isSignedIn() && (
+        isSuperAdmin() ||
+        isDemoUser() ||
+        ((isAdmin() || isRH()) && incoming().tenantId == existing().get('tenantId', incoming().tenantId) && myTenant() == existing().get('tenantId', 'none')) ||
+        (request.auth.uid == userId && (
+          // Case 1: Initial auto-heal or setup (allow changing role/tenantId if they were missing or default)
+          (existing().get('role', 'none') == 'none' || existing().get('role', 'none') == 'operator' || isDemoUser()) ||
+          // Case 2: Restricted update for established users
+          (incoming().tenantId == existing().get('tenantId', incoming().tenantId) &&
+           incoming().role == existing().get('role', incoming().role) &&
+           incoming().diff(existing()).affectedKeys().hasOnly(['name', 'updatedAt', 'points', 'lastCheckIn', 'lastLocation', 'lastSelfie', 'status', 'lastActive', 'clientId', 'email', 'uid']))
+        ))
+      );
+    }
+
+    match /attendance/{id} {
+      allow read: if isSignedIn() && (resource.data.tenantId == myTenant() || isSuperAdmin());
+      allow create: if true; // Webhook entries allowed (validated server-side)
+    }
+
+    match /erp_whitelist/{senderId} {
+      allow read: if true; // For webhook verification
+      allow write: if isSuperAdmin();
     }
 
     match /clients/{clientId} {
-      allow read: if isAuthenticated() && sameTenant(resource.data);
-      allow write: if isAdmin() || (isCEO() && sameTenant(request.resource.data));
+      function isValidClient(data) {
+        return isValidId(clientId) && data.name is string && data.name.size() <= 100 &&
+               data.get('tenantId', 'none') is string;
+      }
+      allow read: if isSignedIn() && (
+        isSuperAdmin() || 
+        isDemoUser() ||
+        (resource.data.get('tenantId', 'none') == myTenant() && (myRole() != 'totem' || clientId == myClientId() || myClientId() == 'none'))
+      );
+      allow create: if isValidClient(incoming()) && (isSuperAdmin() || isDemoUser() || (isRH() && incoming().tenantId == myTenant()));
+      allow update: if isValidClient(incoming()) && (isSuperAdmin() || (isSupervisor() && existing().tenantId == myTenant() && incoming().tenantId == existing().tenantId));
+      allow delete: if isSuperAdmin();
     }
 
     match /tasks/{taskId} {
-      allow read: if isAuthenticated() && sameTenant(resource.data);
-      allow create: if isAuthenticated() && isValidTask(request.resource.data) && sameTenant(request.resource.data);
-      allow update: if isAuthenticated() && isValidTask(request.resource.data) && sameTenant(resource.data) && (isOwner(resource.data.operatorId) || isAdmin() || isCEO());
+      function isValidTask(data) {
+        return isValidId(taskId) && data.title is string && data.title.size() <= 200 &&
+               data.get('tenantId', 'none') is string;
+      }
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow create: if isValidTask(incoming()) && (
+        isSuperAdmin() || 
+        (isSignedIn() && incoming().tenantId == myTenant() && (
+          isSupervisor() || 
+          isClient() || 
+          isTotem() ||
+          incoming().operatorId == request.auth.uid
+        ))
+      );
+      allow update: if isSignedIn() && isValidTask(incoming()) && (isSuperAdmin() || (existing().tenantId == myTenant() && (
+        isAdmin() ||
+        (isSupervisor() && incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'score', 'aiNotes', 'aiFeedback', 'manualApproval', 'approvedBy', 'approvedAt', 
+          'approvalStatus', 'supervisorNote', 'rejectedBy', 'rejectedAt', 'updatedAt', 
+          'operatorId', 'operatorName', 'afterPhoto', 'completedAt', 'auditId', 'areaName'
+        ])) ||
+        (isClient() && incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'manualApproval', 'clientApproved', 'approvedAt', 'aiScore', 'score'
+        ])) ||
+        (existing().operatorId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly([
+          'status', 'afterPhoto', 'completedAt', 'score', 'aiNotes', 'aiFeedback', 'updatedAt', 
+          'auditId', 'areaName'
+        ]))
+      )));
+    }
+
+    match /audits/{auditId} {
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow create: if isSignedIn() && (isSuperAdmin() || incoming().tenantId == myTenant());
+      allow update: if isSignedIn() && (isSuperAdmin() || (existing().tenantId == myTenant() && incoming().tenantId == existing().tenantId));
+      allow delete: if isSuperAdmin() || (isAdmin() && resource.data.tenantId == myTenant());
+    }
+
+    match /reports/{reportId} {
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow create: if isSuperAdmin() || isDemoUser() || (isSupervisor() && incoming().tenantId == myTenant());
+    }
+
+    match /daily_reports/{reportId} {
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow create: if isSuperAdmin() || isDemoUser() || (isSupervisor() && incoming().tenantId == myTenant());
     }
 
     match /inventory/{itemId} {
-      allow read: if isAuthenticated() && sameTenant(resource.data);
-      allow write: if isAdmin() || (isCEO() && sameTenant(request.resource.data));
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow write: if isSuperAdmin() || (isAdmin() && (incoming().tenantId == myTenant() || existing().tenantId == myTenant())) || (isRH() && (incoming().tenantId == myTenant() || existing().tenantId == myTenant()));
+    }
+
+    match /requisitions/{reqId} {
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow create: if isSignedIn() && (isSuperAdmin() || incoming().tenantId == myTenant());
+      allow update: if isSuperAdmin() || (isRH() && existing().tenantId == myTenant() && incoming().tenantId == existing().tenantId);
+    }
+
+    match /redemptions/{redemptionId} {
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow create: if isSignedIn() && (isSuperAdmin() || incoming().tenantId == myTenant());
+      allow update: if isSuperAdmin() || (isRH() && existing().tenantId == myTenant() && incoming().tenantId == existing().tenantId);
+    }
+
+    match /posts/{postId} {
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow create: if isSignedIn() && (isSuperAdmin() || incoming().tenantId == myTenant());
+      allow update: if isSignedIn() && (isSuperAdmin() || (existing().tenantId == myTenant() && (
+        existing().userId == request.auth.uid || isAdmin()
+      )));
+    }
+
+    match /candidates/{candidateId} {
+      allow read: if isSuperAdmin() || (isRH() && resource.data.tenantId == myTenant());
+      allow write: if isSuperAdmin() || (isRH() && (
+        (request.method == 'create' || request.method == 'update') ? incoming().tenantId == myTenant() : (existing().tenantId == myTenant())
+      ));
+    }
+
+    match /staff/{memberId} {
+      allow read: if isSuperAdmin() || isDemoUser() || (isRH() && resource.data.tenantId == myTenant());
+      allow write: if isSuperAdmin() || isDemoUser() || (isRH() && (
+        (request.method == 'create' || request.method == 'update') ? incoming().tenantId == myTenant() : (existing().tenantId == myTenant())
+      ));
+    }
+
+    match /notifications/{notifId} {
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || resource.data.get('tenantId', 'none') == 'global' || isSuperAdmin() || isDemoUser());
+      allow create: if isSignedIn() && (isSupervisor() || isSuperAdmin() || incoming().tenantId == myTenant());
+      allow update: if isSignedIn() && (isSuperAdmin() || (existing().tenantId == myTenant() && incoming().diff(existing()).affectedKeys().hasOnly(['readBy'])));
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow create: if isSignedIn() && (isTotem() || isSupervisor() || isSuperAdmin() || isClient() || myRole() == 'operator');
+      allow update: if isSignedIn() && (isSupervisor() || isSuperAdmin());
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if isSignedIn();
+      allow update: if isSuperAdmin() || (isAdmin() && myTenant() == tenantId);
+      allow create: if isSuperAdmin() || isAdmin();
+    }
+
+    match /kpis/{tenantId} {
+      allow read: if isSignedIn() && (myTenant() == tenantId || isSuperAdmin() || isDemoUser());
+      allow write: if isSuperAdmin() || (isAdmin() && myTenant() == tenantId);
+    }
+
+    match /test/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /automation_logs/{logId} {
+      allow read: if isSignedIn() && (resource.data.get('tenantId', 'none') == myTenant() || isSuperAdmin() || isDemoUser());
+      allow create: if isSignedIn() && (isSupervisor() || isSuperAdmin()) && (incoming().tenantId == myTenant() || isSuperAdmin());
     }
   }
 }
